@@ -88,43 +88,6 @@ def limpiar(dataframe):
     return link_list
 
 '''
-MERCADO LIBRE ONE LINK
-'''
-def scrape_url(reviews_urls, lock):
-    import requests
-    from bs4 import BeautifulSoup
-    import csv
-
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-
-    reviews_texts = []
-
-    for reviews_url in reviews_urls:
-        try:
-            response = requests.get(reviews_url, headers=headers)
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, 'html.parser')
-                reviews = soup.find_all("p", {"class": "ui-review-capability-comments__comment__content ui-review-capability-comments__comment__content"})  # Verifica la clase correcta
-                reviews_texts.extend([review.get_text().strip() for review in reviews])
-            else:
-                print(f"No se pudo acceder a la página de reseñas para la URL: {reviews_url}")
-        except Exception as e:
-            print(f"Error al procesar la URL {reviews_url}: {e}")
-
-    # Write reviews to a CSV file with thread safety
-    lock.acquire()
-    try:
-        with open("reviews_dataML.csv", mode="a", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file)
-            for review in reviews_texts:
-                writer.writerow([review])
-    finally:
-        lock.release()
-
-
-'''
 AMAZON LINKS
 '''
 def getLinksAmazon(product_name):
@@ -183,13 +146,201 @@ def getLinksAmazon(product_name):
         
 
 
+'''
+MERCADO LIBRE ONE LINK
+'''
+def scrape_url(sublistMLReviews, lock):
+    import requests
+    from bs4 import BeautifulSoup
+    import csv
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+
+    def get_reviews(product_url):
+        reviews_texts = []
+        try:
+            response = requests.get(product_url, headers=headers)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                reviews = soup.find_all("p", {"class": "ui-review-capability-comments__comment__content ui-review-capability-comments__comment__content"})
+                reviews_texts = [review.get_text().strip() for review in reviews]
+            else:
+                print(f"No se pudo acceder a la página de reseñas para la URL: {product_url}")
+        except Exception as e:
+            print(f"Error al procesar la URL {product_url}: {e}")
+        return reviews_texts
+
+    for product_url in sublistMLReviews:
+        reviews_texts = get_reviews(product_url)
+        lock.acquire()
+        try:
+            with open("reviews_dataML.csv", mode="a", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                for review in reviews_texts:
+                    writer.writerow([review])
+        finally:
+            lock.release()
+
+
+
+        
+'''
+AMAZON REVIEWS
+'''
+from multiprocessing import Process, Lock
+import time
+import csv
+import random
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import user_agent
+
+def getUserNPassword():
+    with open('notYourBusiness.csv', mode='r', newline='') as file:
+        rows = list(csv.DictReader(file))
+
+    rows_with_status_0 = [row for row in rows if row['status'] == '0']
+    if rows_with_status_0:
+        selected_row = random.choice(rows_with_status_0)
+        for row in rows:
+            if row['id'] == selected_row['id']:
+                row['status'] = '1'
+                break
+
+        with open('notYourBusiness.csv', mode='w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=rows[0].keys())
+            writer.writeheader()
+            writer.writerows(rows)
+
+        return selected_row['id'], selected_row['u'], selected_row['p']
+
+    return None, None, None
+
+def LogInAmazon(driver, wait, email, password, lock):
+    try:
+        if "Iniciar sesión" in driver.title:
+            email_input = wait.until(EC.presence_of_element_located((By.ID, "ap_email")))
+            email_input.send_keys(email)
+            email_input.send_keys(Keys.RETURN)
+            time.sleep(random.uniform(1, 3))
+
+            password_input = wait.until(EC.presence_of_element_located((By.ID, "ap_password")))
+            password_input.send_keys(password)
+            password_input.send_keys(Keys.RETURN)
+            time.sleep(random.uniform(1, 3))
+    except Exception as e:
+        lock.acquire()
+        print(f"Error during login: {e}")
+        lock.release()
+
+def initialize_browser(lock):
+    options = webdriver.ChromeOptions()
+    user_agent_string = user_agent.generate_user_agent()
+    options.add_argument(f"user-agent={user_agent_string}")
+    options.add_argument("--no-first-run")
+    options.add_argument("--no-default-browser-check")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--headless")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
+    options.add_experimental_option('excludeSwitches',['enable-logging'])
+    options.add_argument('--log-level=3')
+
+    try:
+        driver = webdriver.Chrome(options=options)
+        return driver
+    except Exception as e:
+        lock.acquire()
+        print(f"Error initializing Chrome driver: {e}")
+        lock.release()
+        return None
+
+def access_reviews_with_auto_login(product_url, lock):
+    idU, email, password = getUserNPassword()
+    driver = initialize_browser(lock)
+    if driver is None:
+        return
+
+    wait = WebDriverWait(driver, 10)
+    all_reviews = []
+
+    try:
+        driver.get(product_url)
+        time.sleep(random.uniform(1, 3))
+        LogInAmazon(driver, wait, email, password, lock)
+        
+        try:
+            see_all_reviews_link = wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'a[data-hook="see-all-reviews-link-foot"]'))
+            )
+            see_all_reviews_link.click()
+            time.sleep(random.uniform(1, 3))
+        except Exception as e:
+            lock.acquire()
+            print(f"Error clicking 'see all reviews' link for {product_url}: {e}")
+            lock.release()
+            return
+
+        LogInAmazon(driver, wait, email, password, lock)
+
+        while True:
+            try:
+                review_elements = wait.until(
+                    EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'span[data-hook="review-body"]'))
+                )
+                for review in review_elements:
+                    all_reviews.append(review.text)
+                
+                time.sleep(random.uniform(1, 3))
+                
+                next_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'li.a-last a')))
+                next_button.click()
+                time.sleep(random.uniform(1, 3))
+            except Exception as e:
+                lock.acquire()
+                print(f"Error navigating to the next page for {product_url}: {e}")
+                lock.release()
+                break
+
+        lock.acquire()
+        try:
+            with open("reviews_dataAmazon.csv", mode="a", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                for review in all_reviews:
+                    writer.writerow([review])
+            print(f"Saved reviews for {product_url}")
+        except Exception as e:
+            print(f"Error saving reviews for {product_url}: {e}")
+        finally:
+            lock.release()
+
+    except Exception as e:
+        lock.acquire()
+        print(f"An error occurred for {product_url}: {e}")
+        lock.release()
+
+    finally:
+        driver.quit()
+
+def AmazonReviews(sublistAmazonReviews, lock):
+    for product_url in sublistAmazonReviews:
+        access_reviews_with_auto_login(product_url, lock)
+
 
 if __name__ == '__main__':
-    import multiprocess, time, multiprocessing
-
+    from multiprocessing import Lock, Process
+    import time 
+    
     threads = []
     N_THREADS = 6
-    
+
     product_name = input("\nProducto: ")
     linksML = getLinksML(product_name)
     linkscleanML = limpiar(linksML)
@@ -198,13 +349,14 @@ if __name__ == '__main__':
     sublistsML = nivelacion_cargas(linkscleanML, N_THREADS)
     sublistsAmazon = nivelacion_cargas(linksAmazon, N_THREADS)
 
-    lock = multiprocess.Lock()
+    lock = Lock()
     for i in range(N_THREADS):
-        # Initialize each process with a sublist of URLs
-        threads.append(multiprocess.Process(target=scrape_url, args=(sublistsML[i], lock)))
+        # Initialize each process for Mercado Libre and Amazon reviews
+        threads.append(Process(target=scrape_url, args=(sublistsML[i], lock)))
+        threads.append(Process(target=AmazonReviews, args=(sublistsAmazon[i], lock)))
 
     start_time = time.perf_counter()
-    
+
     # Start all threads
     for thread in threads:
         thread.start()
@@ -212,8 +364,7 @@ if __name__ == '__main__':
     # Wait for all threads to complete
     for thread in threads:
         thread.join()
-                
+
     finish_time = time.perf_counter()
     print(f"Program finished in {finish_time - start_time} seconds")
-
 
