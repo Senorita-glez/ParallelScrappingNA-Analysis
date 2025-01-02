@@ -94,7 +94,7 @@ def getLinksAmazon(product_name):
     import requests
     from bs4 import BeautifulSoup
     from user_agent import generate_user_agent
-    import csv
+
     url = "https://www.amazon.com.mx/s"  # URL de búsqueda en Amazon México
 
     # Parámetros para la búsqueda
@@ -105,44 +105,57 @@ def getLinksAmazon(product_name):
     # Encabezados personalizados
     custom_headers = {
         'user-agent': generate_user_agent(),  # Generar un User-Agent aleatorio
-        'accept-language': 'en-GB,en;q=0.9', # mejorar los headers 
+        'accept-language': 'en-GB,en;q=0.9', # Mejorar los headers
     }
 
     # Lista para almacenar los enlaces de los productos
     product_links_list = []
-    num_products = 500  # Número de productos a recolectar
+    num_products = 30 # Número de productos a recolectar
     current_url = url  # URL inicial para comenzar la búsqueda
 
     while len(product_links_list) < num_products:
-        response = requests.get(current_url, params=params, headers=custom_headers)
-        
-        # Comprobamos que la solicitud fue exitosa
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            product_links = soup.find_all("a", class_="a-link-normal s-underline-text s-underline-link-text s-link-style a-text-normal")
+        try:
+            response = requests.get(current_url, params=params, headers=custom_headers)
 
-            for product in product_links:
-                if len(product_links_list) >= num_products:
-                    break
+            # Comprobamos que la solicitud fue exitosa
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
 
-                link = "https://www.amazon.com.mx" + product['href']
-                product_links_list.append(link)
-            
-            next_page = soup.find("a", class_="s-pagination-item s-pagination-next s-pagination-button s-pagination-separator")
-            
-            if next_page and 'href' in next_page.attrs:
-                current_url = "https://www.amazon.com.mx" + next_page['href']
+                # Imprimir el título de la página
+                page_title = soup.title.string.strip() if soup.title else "Sin título"
+                print(f"Visitando página: {page_title}")
+
+                # Encontrar enlaces de productos con la clase especificada
+                product_links = soup.find_all(
+                    "a", 
+                    class_="a-link-normal s-line-clamp-4 s-link-style a-text-normal"
+                )
+
+                for product in product_links:
+                    if len(product_links_list) >= num_products:
+                        break
+
+                    link = "https://www.amazon.com.mx" + product['href']
+                    product_links_list.append(link)
+
+                # Buscar enlace de la siguiente página
+                next_page = soup.find("a", class_="s-pagination-item s-pagination-next s-pagination-button s-pagination-separator")
+
+                if next_page and 'href' in next_page.attrs:
+                    current_url = "https://www.amazon.com.mx" + next_page['href']
+                else:
+                    print("No hay más páginas disponibles o ya se han recolectado todos los productos.")
+                    return product_links_list
+
             else:
-                print("yap quedo o no hay massss ")
-                with open(f"{product_name}_product_links.csv", mode='w', newline='', encoding='utf-8') as file:
-                    writer = csv.writer(file)
-                    writer.writerow(["Product Link"])  # Write header
-                    for link in product_links_list:
-                        writer.writerow([link])
-                return product_links_list
-        else:
-            print("No se pudo acceder a la página. Status code:", response.status_code)
+                print(f"Error al acceder a la página. Código de estado: {response.status_code}")
+                return None
+
+        except Exception as e:
+            print(f"Ocurrió un error al intentar acceder a la página: {e}")
             return None
+
+    return product_links_list
         
 
 
@@ -207,10 +220,10 @@ def getUserNPassword():
     rows_with_status_0 = [row for row in rows if row['status'] == '0']
     if rows_with_status_0:
         selected_row = random.choice(rows_with_status_0)
-        for row in rows:
-            if row['id'] == selected_row['id']:
-                row['status'] = '1'
-                break
+        #for row in rows:
+            #if row['id'] == selected_row['id']:
+                #row['status'] = '1'
+                #break
 
         with open('notYourBusiness.csv', mode='w', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=rows[0].keys())
@@ -263,12 +276,19 @@ def initialize_browser(lock):
         return None
 
 def access_reviews_with_auto_login(product_url, lock):
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    import time
+    import random
+    import csv
+
     idU, email, password = getUserNPassword()
     driver = initialize_browser(lock)
     if driver is None:
         return
 
-    wait = WebDriverWait(driver, 10)
+    wait = WebDriverWait(driver, 20)  # Increased wait time to 20 seconds
     all_reviews = []
 
     try:
@@ -284,7 +304,7 @@ def access_reviews_with_auto_login(product_url, lock):
             time.sleep(random.uniform(1, 3))
         except Exception as e:
             lock.acquire()
-            print(f"Error clicking 'see all reviews' link for {product_url}: {e}")
+            print(f"Error clicking 'see all reviews' link for {product_url} (Page title: {driver.title}): {e}")
             lock.release()
             return
 
@@ -292,6 +312,7 @@ def access_reviews_with_auto_login(product_url, lock):
 
         while True:
             try:
+                LogInAmazon(driver, wait, email, password, lock)
                 review_elements = wait.until(
                     EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'span[data-hook="review-body"]'))
                 )
@@ -305,7 +326,7 @@ def access_reviews_with_auto_login(product_url, lock):
                 time.sleep(random.uniform(1, 3))
             except Exception as e:
                 lock.acquire()
-                print(f"Error navigating to the next page for {product_url}: {e}")
+                print(f"Error navigating to the next page for {product_url} (Page title: {driver.title}): {e}")
                 lock.release()
                 break
 
@@ -317,17 +338,21 @@ def access_reviews_with_auto_login(product_url, lock):
                     writer.writerow([review])
             print(f"Saved reviews for {product_url}")
         except Exception as e:
-            print(f"Error saving reviews for {product_url}: {e}")
+
+            print(f"Error saving reviews for {product_url} (Page title: {driver.title}): {e}")
         finally:
             lock.release()
 
     except Exception as e:
         lock.acquire()
-        print(f"An error occurred for {product_url}: {e}")
+        print(f"An error occurred for {product_url} (Page title: {driver.title}): {e}")
         lock.release()
 
     finally:
+        driver.save_screenshot("error_screenshot.png")  # Save a screenshot for debugging
+        print(driver.page_source)  # Print page source for debugging
         driver.quit()
+
 
 def AmazonReviews(sublistAmazonReviews, lock):
     for product_url in sublistAmazonReviews:
@@ -339,7 +364,7 @@ if __name__ == '__main__':
     import time 
     
     threads = []
-    N_THREADS = 6
+    N_THREADS = 1
 
     product_name = input("\nProducto: ")
     linksML = getLinksML(product_name)
@@ -352,7 +377,7 @@ if __name__ == '__main__':
     lock = Lock()
     for i in range(N_THREADS):
         # Initialize each process for Mercado Libre and Amazon reviews
-        threads.append(Process(target=scrape_url, args=(sublistsML[i], lock)))
+        #threads.append(Process(target=scrape_url, args=(sublistsML[i], lock)))
         threads.append(Process(target=AmazonReviews, args=(sublistsAmazon[i], lock)))
 
     start_time = time.perf_counter()
