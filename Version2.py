@@ -94,6 +94,7 @@ def getLinksAmazon(product_name):
     import requests
     from bs4 import BeautifulSoup
     from user_agent import generate_user_agent
+    import csv
 
     url = "https://www.amazon.com.mx/s"  # URL de búsqueda en Amazon México
 
@@ -108,12 +109,12 @@ def getLinksAmazon(product_name):
         'accept-language': 'en-GB,en;q=0.9', # Mejorar los headers
     }
 
-    # Lista para almacenar los enlaces de los productos
-    product_links_list = []
-    num_products = 30 # Número de productos a recolectar
+    # Lista para almacenar los enlaces y precios de los productos
+    products = []
+    num_products = 10  # Número de productos a recolectar
     current_url = url  # URL inicial para comenzar la búsqueda
 
-    while len(product_links_list) < num_products:
+    while len(products) < num_products:
         try:
             response = requests.get(current_url, params=params, headers=custom_headers)
 
@@ -131,21 +132,25 @@ def getLinksAmazon(product_name):
                     class_="a-link-normal s-line-clamp-4 s-link-style a-text-normal"
                 )
 
-                for product in product_links:
-                    if len(product_links_list) >= num_products:
+                # Encontrar precios de los productos
+                product_prices = soup.find_all("span", class_="a-price-whole")
+
+                for product, price in zip(product_links, product_prices):
+                    if len(products) >= num_products:
                         break
 
                     link = "https://www.amazon.com.mx" + product['href']
-                    product_links_list.append(link)
+                    price_text = price.get_text(strip=True).replace(".", "")  # Limpiar el precio
+                    products.append({"link": link, "price": price_text})
 
                 # Buscar enlace de la siguiente página
-                next_page = soup.find("a", class_="s-pagination-item s-pagination-next s-pagination-button s-pagination-separator")
+                next_page = soup.find("a", class_="s-pagination-item s-pagination-next s-pagination-button s-pagination-button-accessibility s-pagination-separator")
 
                 if next_page and 'href' in next_page.attrs:
                     current_url = "https://www.amazon.com.mx" + next_page['href']
                 else:
                     print("No hay más páginas disponibles o ya se han recolectado todos los productos.")
-                    return product_links_list
+                    break
 
             else:
                 print(f"Error al acceder a la página. Código de estado: {response.status_code}")
@@ -155,7 +160,16 @@ def getLinksAmazon(product_name):
             print(f"Ocurrió un error al intentar acceder a la página: {e}")
             return None
 
-    return product_links_list
+    # Guardar los datos en un archivo CSV
+    with open("productos.csv", "w", newline="", encoding="utf-8") as csvfile:
+        fieldnames = ["link", "price"]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+        writer.writeheader()
+        writer.writerows(products)
+
+    print("Datos guardados en productos.csv")
+    return products
         
 
 
@@ -292,7 +306,7 @@ def access_reviews_with_auto_login(product_url, lock):
     all_reviews = []
 
     try:
-        driver.get(product_url)
+        driver.get(product_url['link'])
         time.sleep(random.uniform(1, 3))
         LogInAmazon(driver, wait, email, password, lock)
         
@@ -304,7 +318,7 @@ def access_reviews_with_auto_login(product_url, lock):
             time.sleep(random.uniform(1, 3))
         except Exception as e:
             lock.acquire()
-            print(f"Error clicking 'see all reviews' link for {product_url} (Page title: {driver.title}): {e}")
+            print(f"Error clicking 'see all reviews' link for {product_url} (Page title: {driver.title})")
             lock.release()
             return
 
@@ -377,7 +391,7 @@ if __name__ == '__main__':
     lock = Lock()
     for i in range(N_THREADS):
         # Initialize each process for Mercado Libre and Amazon reviews
-        #threads.append(Process(target=scrape_url, args=(sublistsML[i], lock)))
+        threads.append(Process(target=scrape_url, args=(sublistsML[i], lock)))
         threads.append(Process(target=AmazonReviews, args=(sublistsAmazon[i], lock)))
 
     start_time = time.perf_counter()
