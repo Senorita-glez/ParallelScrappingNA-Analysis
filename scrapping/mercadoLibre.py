@@ -26,10 +26,14 @@ def getLinksML(product_name):
             break
 
         for post in content:
+
+            price_tag = post.find("span", class_="andes-money-amount__fraction")
+            price = price_tag.text if price_tag else "N/A"  # Default to "N/A" if not found
+
             post_link = post.find("a")["href"]
             post_data = {
                 # "title": title,
-            #     "price": price,
+                "price": price,
                 "post link": post_link,        
             }
             data.append(post_data)
