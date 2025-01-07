@@ -36,7 +36,7 @@ param_grid_svm = {
 }
 
 param_grid_rn = {
-    'hidden_layer_sizes': [(50,), (100,)],
+    'hidden_layer_sizes': [(100,), (200,)],
     'activation': ['tanh', 'relu'],
     'solver': ['adam', 'sgd']
 }
@@ -48,7 +48,7 @@ keys_rn, values_rn = zip(*param_grid_rn.items())
 combinations_rn = [dict(zip(keys_rn, v)) for v in itertools.product(*values_rn)]
 
 def evaluate_svm(hyperparameter_set, mejor_result, lock):
-    df = pd.read_csv('../embeddings_con_etiqueta_en.csv')
+    df = pd.read_csv('../embeddings_con_etiqueta_mejorado_en.csv')
     X = df.iloc[:, :-1].values
     y = df.iloc[:, -1].values
 
@@ -70,7 +70,7 @@ def evaluate_svm(hyperparameter_set, mejor_result, lock):
         lock.release()
 
 def evaluate_rn(hyperparameter_set, mejor_result, lock):
-    df = pd.read_csv('../embeddings_con_etiqueta_en.csv')
+    df = pd.read_csv('../embeddings_con_etiqueta_mejorado_en.csv')
     X = df.iloc[:, :-1].values
     y = df.iloc[:, -1].values
 
@@ -92,7 +92,7 @@ def evaluate_rn(hyperparameter_set, mejor_result, lock):
         lock.release()
 
 def evaluate_nb(mejor_result, lock):
-    df = pd.read_csv('../embeddings_con_etiqueta_en.csv')
+    df = pd.read_csv('../embeddings_con_etiqueta_mejorado_en.csv')
     X = df.iloc[:, :-1].values
     y = df.iloc[:, -1].values
 
@@ -143,7 +143,7 @@ if __name__ == '__main__':
         print(f"\nTiempo: {finish_time - start_time:.2f} segundos")
 
         # Entrenar y guardar modelos
-        df = pd.read_csv('../embeddings_con_etiqueta_en.csv')
+        df = pd.read_csv('../embeddings_con_etiqueta_mejorado_en.csv')
         X = df.iloc[:, :-1].values
         y = df.iloc[:, -1].values
 
@@ -153,16 +153,16 @@ if __name__ == '__main__':
 
         svm_model = SVC(**mejor_result_svm['params'])
         svm_model.fit(X_train, y_train)
-        dump(svm_model, 'svm_model.joblib')
+        dump(svm_model, 'svm_model_better.joblib')
 
         # RN
         rn_model = MLPClassifier(**mejor_result_rn['params'])
         rn_model.fit(X_train, y_train)
-        dump(rn_model, 'rn_model.joblib')
+        dump(rn_model, 'rn_model_better.joblib')
 
         # NB
         nb_model = GaussianNB()
         nb_model.fit(X_train, y_train)
-        dump(nb_model, 'nb_model.joblib')
+        dump(nb_model, 'nb_model_better.joblib')
 
         print("Modelos guardados exitosamente.")
