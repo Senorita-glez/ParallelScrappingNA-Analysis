@@ -22,7 +22,7 @@ def getLinksAmazon(product_name):
 
     # Lista para almacenar los enlaces y precios de los productos
     products = []
-    num_products = 10  # Número de productos a recolectar
+    num_products = 500  # Número de productos a recolectar
     current_url = url  # URL inicial para comenzar la búsqueda
 
     while len(products) < num_products:
@@ -35,7 +35,7 @@ def getLinksAmazon(product_name):
 
                 # Imprimir el título de la página
                 page_title = soup.title.string.strip() if soup.title else "Sin título"
-                print(f"Visitando página: {page_title}")
+                #print(f"Visitando página: {page_title}")
 
                 # Encontrar enlaces de productos con la clase especificada
                 product_links = soup.find_all(
@@ -64,15 +64,15 @@ def getLinksAmazon(product_name):
                     break
 
             else:
-                print(f"Error al acceder a la página. Código de estado: {response.status_code}")
+                #print(f"Error al acceder a la página. Código de estado: {response.status_code}")
                 return None
 
         except Exception as e:
-            print(f"Ocurrió un error al intentar acceder a la página: {e}")
+            #print(f"Ocurrió un error al intentar acceder a la página: {e}")
             return None
 
     # Guardar los datos en un archivo CSV
-    with open("productos.csv", "w", newline="", encoding="utf-8") as csvfile:
+    with open("output/productosAmazon.csv", "w", newline="", encoding="utf-8") as csvfile:
         fieldnames = ["link", "price"]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
@@ -85,7 +85,7 @@ def getLinksAmazon(product_name):
 def getUserNPassword():
     import csv
     import random
-    with open('notYourBusiness.csv', mode='r', newline='') as file:
+    with open('utils/notYourBusiness.csv', mode='r', newline='') as file:
         rows = list(csv.DictReader(file))
 
     rows_with_status_0 = [row for row in rows if row['status'] == '0']
@@ -96,7 +96,7 @@ def getUserNPassword():
                 #row['status'] = '1'
                 #break
 
-        with open('notYourBusiness.csv', mode='w', newline='') as file:
+        with open('utils/notYourBusiness.csv', mode='w', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=rows[0].keys())
             writer.writeheader()
             writer.writerows(rows)
@@ -116,12 +116,12 @@ def LogInAmazon(driver, wait, email, password, lock):
             email_input = wait.until(EC.presence_of_element_located((By.ID, "ap_email")))
             email_input.send_keys(email)
             email_input.send_keys(Keys.RETURN)
-            time.sleep(random.uniform(1, 3))
+            time.sleep(random.uniform(1, 4))
 
             password_input = wait.until(EC.presence_of_element_located((By.ID, "ap_password")))
             password_input.send_keys(password)
             password_input.send_keys(Keys.RETURN)
-            time.sleep(random.uniform(1, 3))
+            time.sleep(random.uniform(1, 4))
     except Exception as e:
         lock.acquire()
         print(f"Error during login: {e}")
@@ -182,7 +182,7 @@ def access_reviews_with_auto_login(product_url, lock):
             time.sleep(random.uniform(1, 3))
         except Exception as e:
             lock.acquire()
-            print(f"Error clicking 'see all reviews' link for {product_url} (Page title: {driver.title})")
+            #print(f"Error clicking 'see all reviews' link for {product_url} (Page title: {driver.title})")
             lock.release()
             return
 
@@ -204,7 +204,7 @@ def access_reviews_with_auto_login(product_url, lock):
                 time.sleep(random.uniform(1, 3))
             except Exception as e:
                 lock.acquire()
-                print(f"Error navigating to the next page for {product_url} (Page title: {driver.title}): {e}")
+                #print(f"Error navigating to the next page for {product_url} (Page title: {driver.title}): {e}")
                 lock.release()
                 break
 
@@ -215,15 +215,14 @@ def access_reviews_with_auto_login(product_url, lock):
                 for review in all_reviews:
                     writer.writerow([review])
             print(f"Saved reviews for {product_url}")
-        except Exception as e:
-
-            print(f"Error saving reviews for {product_url} (Page title: {driver.title}): {e}")
+        #except Exception as e:
+            #print(f"Error saving reviews for {product_url} (Page title: {driver.title}): {e}")
         finally:
             lock.release()
 
     except Exception as e:
         lock.acquire()
-        print(f"An error occurred for {product_url} (Page title: {driver.title}): {e}")
+        #print(f"An error occurred for {product_url} (Page title: {driver.title}): {e}")
         lock.release()
 
     finally:

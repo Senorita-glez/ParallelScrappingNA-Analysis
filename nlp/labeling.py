@@ -5,13 +5,13 @@ import csv
 import os
 
 # Cargar los modelos entrenados para ambos idiomas
-svm_model_es = load('nlp/sentimentAnalysis/svm_model_es.joblib')
-rn_model_es = load('nlp/sentimentAnalysis/rn_model_es.joblib')
-nb_model_es = load('nlp/sentimentAnalysis/nb_model_es.joblib')
+svm_model_es = load('nlp/sentimentAnalysis/modelsES/svm_model_es.joblib')
+rn_model_es = load('nlp/sentimentAnalysis/modelsES/rn_model_es.joblib')
+nb_model_es = load('nlp/sentimentAnalysis/modelsES/nb_model_es.joblib')
 
-svm_model_en = load('nlp/sentimentAnalysis/svm_model_en.joblib')
-rn_model_en = load('nlp/sentimentAnalysis/rn_model_en.joblib')
-nb_model_en = load('nlp/sentimentAnalysis/nb_model_en.joblib')
+svm_model_en = load('nlp/sentimentAnalysis/modelsEN/svm_model_en.joblib')
+rn_model_en = load('nlp/sentimentAnalysis/modelsEN/rn_model_en.joblib')
+nb_model_en = load('nlp/sentimentAnalysis/modelsEN/nb_model_en.joblib')
 
 def label_worker_row(row, lock, output_file):
     """

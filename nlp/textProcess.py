@@ -12,8 +12,6 @@ def obtener_stopwords(idioma):
     stop_words.discard('no')  # Remove 'no' from the set of stopwords
     return stop_words
 
-
-
 def limpiar_texto(texto):
     
     from langdetect import detect, LangDetectException
@@ -45,33 +43,51 @@ def limpiar_texto(texto):
     return texto_limpio if texto_limpio.strip() else None
 
 from transformers import AutoTokenizer, AutoModel
-tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-model = AutoModel.from_pretrained("bert-base-uncased", ignore_mismatched_sizes=True)
+import torch
+import numpy as np
+import os
+import csv
+from langdetect import detect, LangDetectException
 
-def obtener_embedding_oracion(oracion):
-    import torch
+# Inicializar modelos y tokenizadores
+tokenizer_es = AutoTokenizer.from_pretrained("dccuchile/bert-base-spanish-wwm-cased")
+model_es = AutoModel.from_pretrained("dccuchile/bert-base-spanish-wwm-cased")
+
+tokenizer_en = AutoTokenizer.from_pretrained("bert-base-uncased")
+model_en = AutoModel.from_pretrained("bert-base-uncased", ignore_mismatched_sizes=True)
+
+def obtener_embedding_oracion(oracion, idioma):
+    """
+    Obtiene el embedding de una oración utilizando el modelo correspondiente al idioma.
+    """
+    if idioma == 'es':
+        tokenizer = tokenizer_es
+        model = model_es
+    else:  # Por defecto, usar el modelo en inglés
+        tokenizer = tokenizer_en
+        model = model_en
+
     inputs = tokenizer(oracion, return_tensors="pt", padding=True, truncation=True)
     with torch.no_grad():
         outputs = model(**inputs)
     return outputs.last_hidden_state.mean(dim=1).squeeze().numpy()
 
-def obtener_embedding_texto(texto):
-    import numpy as np 
+def obtener_embedding_texto(texto, idioma):
+    """
+    Procesa un texto completo, genera embeddings para cada oración y los promedia.
+    """
     texto_limpio = limpiar_texto(texto)
     if not texto_limpio:
-        return np.zeros(model.config.hidden_size)  # Retornar un vector cero si el texto está vacío
+        return np.zeros(model_en.config.hidden_size if idioma == 'en' else model_es.config.hidden_size)
 
     oraciones = texto_limpio.split('. ')  # Dividir en oraciones simples
-    embeddings = [obtener_embedding_oracion(oracion) for oracion in oraciones if oracion.strip()]
-    return np.mean(embeddings, axis=0) if embeddings else np.zeros(model.config.hidden_size)
-
-
+    embeddings = [obtener_embedding_oracion(oracion, idioma) for oracion in oraciones if oracion.strip()]
+    return np.mean(embeddings, axis=0) if embeddings else np.zeros(model_en.config.hidden_size if idioma == 'en' else model_es.config.hidden_size)
 
 def preprocessText(name, listT, lock):
-    import csv
-    import os
-    from langdetect import detect, LangDetectException
-
+    """
+    Preprocesa texto, detecta idioma, calcula embeddings y los guarda en un archivo.
+    """
     output_file = f'nlp/preprocess_{name}_Text.csv'
     os.makedirs('nlp', exist_ok=True)  # Asegúrate de que el directorio exista
 
@@ -80,7 +96,7 @@ def preprocessText(name, listT, lock):
         if not os.path.exists(output_file):
             with open(output_file, 'w', encoding='utf-8', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(['id', 'idioma'] + [f'embedding_{i}' for i in range(model.config.hidden_size)])  # Encabezados
+                writer.writerow(['id', 'idioma'] + [f'embedding_{i}' for i in range(model_en.config.hidden_size)])  # Encabezados
 
     # Procesar datos
     for review_id, text in listT:
@@ -91,7 +107,7 @@ def preprocessText(name, listT, lock):
             idioma = "unknown"  # Si no se puede detectar el idioma
 
         # Obtener el embedding del texto
-        embedding = obtener_embedding_texto(text)
+        embedding = obtener_embedding_texto(text, idioma)
         if embedding is not None:
             with lock:
                 with open(output_file, 'a', encoding='utf-8', newline='') as f:

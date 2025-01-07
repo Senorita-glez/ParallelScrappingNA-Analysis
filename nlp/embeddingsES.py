@@ -50,7 +50,7 @@ if missing_columns:
 data = data[['reviews.text', 'reviews.text_esp', 'reviews.rating']].copy()
 
 # Asignar sentimiento
-data['sentimiento'] = data['reviews.rating'].apply(lambda x: '1' if x >= 4.0 else '0')
+data['sentimiento'] = data['reviews.rating'].apply(lambda x: '1' if x >= 3.0 else '0')
 
 # Separar datos en dos DataFrames, uno para español y otro para inglés
 data_espanol = data[['reviews.text_esp', 'sentimiento']].rename(columns={'reviews.text_esp': 'texto'})
