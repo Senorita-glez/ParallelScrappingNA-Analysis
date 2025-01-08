@@ -8,8 +8,8 @@ def addIdCsv(archivo_original, name):
     :param name: Nombre de la columna de texto original.
     """
 
-    # Leer el archivo original
-    df = pd.read_csv(archivo_original, names=[name])
+    # Leer el archivo original respetando las comillas para valores con comas
+    df = pd.read_csv(archivo_original, names=[name], quotechar='"', engine='python')
     
     # Eliminar filas vacías y reiniciar índices
     df = df.dropna().reset_index(drop=True)
@@ -17,9 +17,8 @@ def addIdCsv(archivo_original, name):
     # Agregar la columna de ID como la primera columna
     df.insert(0, 'id', df.index + 1)  # Insertar la columna 'id' en la posición 0
     
-    # Sobrescribir el archivo original
-    df.to_csv(archivo_original, index=False)
-    # print(f"El archivo {archivo_original} ha sido modificado eliminando filas vacías y agregando una columna de ID.")
+    # Sobrescribir el archivo original respetando las comillas
+    df.to_csv(archivo_original, index=False, quotechar='"', quoting=1)  # quoting=1 asegura que las comillas se respeten
 
 
 def combinar_csv_por_id(csv1_path, csv2_path, output_path):

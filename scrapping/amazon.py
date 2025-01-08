@@ -22,7 +22,7 @@ def getLinksAmazon(product_name):
 
     # Lista para almacenar los enlaces y precios de los productos
     products = []
-    num_products = 500  # Número de productos a recolectar
+    num_products = 100  # Número de productos a recolectar
     current_url = url  # URL inicial para comenzar la búsqueda
 
     while len(products) < num_products:
@@ -72,7 +72,7 @@ def getLinksAmazon(product_name):
             return None
 
     # Guardar los datos en un archivo CSV
-    with open("output/productosAmazon.csv", "w", newline="", encoding="utf-8") as csvfile:
+    with open("scrapping/outputScrapping/AmazonLinks.csv", "w", newline="", encoding="utf-8") as csvfile:
         fieldnames = ["link", "price"]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
@@ -210,7 +210,7 @@ def access_reviews_with_auto_login(product_url, lock):
 
         lock.acquire()
         try:
-            with open("reviews_dataAmazon.csv", mode="a", newline="", encoding="utf-8") as file:
+            with open("scrapping/outputScrapping/reviewsAmazon.csv", mode="a", newline="", encoding="utf-8") as file:
                 writer = csv.writer(file)
                 for review in all_reviews:
                     writer.writerow([review])

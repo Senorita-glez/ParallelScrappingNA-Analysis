@@ -40,7 +40,7 @@ def limpiar_texto(texto):
         for token in doc if token.text.lower() not in stop_words and not token.is_digit
     ])
 
-    return texto_limpio if texto_limpio.strip() else None
+    return texto_limpio
 
 from transformers import AutoTokenizer, AutoModel
 import torch
